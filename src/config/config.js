@@ -52,6 +52,7 @@ localStorage = {
 export const STORAGE = {
   whitelisted: 'whitelisted',
   encryptedKey: 'encryptedKey',
+  addresses: 'addresses',
   accounts: 'accounts',
   currentAccount: 'currentAccount',
   network: 'network',

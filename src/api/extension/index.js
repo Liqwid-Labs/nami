@@ -432,9 +432,9 @@ export const getCollateral = async () => {
 
 export const getAddress = async () => {
   await Loader.load();
-  const currentAccount = await getCurrentAccount();
+  const currentAddress = await getCurrentAddress();
   const paymentAddr = Buffer.from(
-    Loader.Cardano.Address.from_bech32(currentAccount.paymentAddr).to_bytes(),
+    Loader.Cardano.Address.from_bech32(currentAddress.paymentAddr).to_bytes(),
     'hex'
   ).toString('hex');
   return paymentAddr;
@@ -514,6 +514,14 @@ export const getCurrentAccount = async () => {
   const accounts = await getStorage(STORAGE.accounts);
   const network = await getNetwork();
   return accountToNetworkSpecific(accounts[currentAccountIndex], network);
+};
+
+export const getCurrentAddress = async () => {
+  const currentAccountIndex = await getCurrentAccountIndex();
+  const addresses = await getStorage(STORAGE.addresses);
+  const paymentAddr = addresses[currentAccountIndex];
+  const network = await getNetwork();
+  return { paymentAddr, network }
 };
 
 /** Returns accounts with network specific settings (e.g. address, reward address, etc.) */
@@ -1253,7 +1261,7 @@ export const resetStorage = async (password) => {
   return true;
 };
 
-export const createAccount = async (name, password, accountIndex = null) => {
+export const createAccount = async (name, accountIndex = null) => {
   await Loader.load();
 
   const existingAccounts = await getStorage(STORAGE.accounts);
@@ -1264,62 +1272,44 @@ export const createAccount = async (name, password, accountIndex = null) => {
     ? Object.keys(getNativeAccounts(existingAccounts)).length
     : 0;
 
-  let { accountKey, paymentKey, stakeKey } = await requestAccountKey(
-    password,
-    index
-  );
+  const address = await getAddress()
+  const addressHeader = Buffer.from(address.slice(0, 2), 'hex')[0];
 
-  const publicKey = Buffer.from(accountKey.to_public().as_bytes()).toString(
-    'hex'
-  ); // BIP32 Public key
-  const paymentKeyPub = paymentKey.to_public();
-  const stakeKeyPub = stakeKey.to_public();
+  if ((addressHeader & 0xFE) != 0x00) throw 'Only base addresses are currently supported';
 
-  accountKey.free();
-  paymentKey.free();
-  stakeKey.free();
-  accountKey = null;
-  paymentKey = null;
-  stakeKey = null;
+  const paymentKeyHash = address.slice(2, 58);
+  const stakeKeyHash = address.slice(58, );
+  
+  const cpaymentKeyHash = Loader.Cardano.Ed25519KeyHash.from_hex(paymentKeyHash)
+  const cstakeKeyHash = Loader.Cardano.Ed25519KeyHash.from_hex(stakeKeyHash)
 
-  const paymentKeyHash = Buffer.from(
-    paymentKeyPub.hash().to_bytes(),
-    'hex'
-  ).toString('hex');
-
-  const paymentKeyHashBech32 = paymentKeyPub.hash().to_bech32('addr_vkh');
-
-  const stakeKeyHash = Buffer.from(
-    stakeKeyPub.hash().to_bytes(),
-    'hex'
-  ).toString('hex');
-
+  const paymentKeyHashBech32 = cpaymentKeyHash.to_bech32('addr_vkh');
   const paymentAddrMainnet = Loader.Cardano.BaseAddress.new(
     Loader.Cardano.NetworkInfo.mainnet().network_id(),
-    Loader.Cardano.StakeCredential.from_keyhash(paymentKeyPub.hash()),
-    Loader.Cardano.StakeCredential.from_keyhash(stakeKeyPub.hash())
+    Loader.Cardano.StakeCredential.from_keyhash(cpaymentKeyHash),
+    Loader.Cardano.StakeCredential.from_keyhash(cstakeKeyHash)
   )
     .to_address()
     .to_bech32();
 
   const rewardAddrMainnet = Loader.Cardano.RewardAddress.new(
     Loader.Cardano.NetworkInfo.mainnet().network_id(),
-    Loader.Cardano.StakeCredential.from_keyhash(stakeKeyPub.hash())
+    Loader.Cardano.StakeCredential.from_keyhash(cstakeKeyHash)
   )
     .to_address()
     .to_bech32();
 
   const paymentAddrTestnet = Loader.Cardano.BaseAddress.new(
     Loader.Cardano.NetworkInfo.testnet().network_id(),
-    Loader.Cardano.StakeCredential.from_keyhash(paymentKeyPub.hash()),
-    Loader.Cardano.StakeCredential.from_keyhash(stakeKeyPub.hash())
+    Loader.Cardano.StakeCredential.from_keyhash(cpaymentKeyHash),
+    Loader.Cardano.StakeCredential.from_keyhash(cstakeKeyHash)
   )
     .to_address()
     .to_bech32();
 
   const rewardAddrTestnet = Loader.Cardano.RewardAddress.new(
     Loader.Cardano.NetworkInfo.testnet().network_id(),
-    Loader.Cardano.StakeCredential.from_keyhash(stakeKeyPub.hash())
+    Loader.Cardano.StakeCredential.from_keyhash(cstakeKeyHash)
   )
     .to_address()
     .to_bech32();
@@ -1334,7 +1324,6 @@ export const createAccount = async (name, password, accountIndex = null) => {
   const newAccount = {
     [index]: {
       index,
-      publicKey,
       paymentKeyHash,
       paymentKeyHashBech32,
       stakeKeyHash,
@@ -1678,6 +1667,28 @@ export const createWallet = async (name, seedPhrase, password) => {
   return true;
 };
 
+export const createReadOnlyAccount = async (name, address) => {
+  await Loader.load();
+  try {
+    Loader.Cardano.Address.from_bech32(address);
+  } catch {
+    throw `Invalid address: ${address}`;
+  }
+  const addresses = await getStorage(STORAGE.addresses) || [];
+  const accountIndex = addresses.length;
+  addresses.push(address)
+  await setStorage({
+    [STORAGE.currency]: 'usd',
+    [STORAGE.currentAccount]: accountIndex,
+    [STORAGE.addresses]: addresses,
+    [STORAGE.network]: { id: NETWORK_ID.mainnet, node: NODE.mainnet },
+  });
+  await createAccount(name, accountIndex);
+  await switchAccount(accountIndex);
+
+  return accountIndex;
+};
+
 export const mnemonicToObject = (mnemonic) => {
   const mnemonicMap = {};
   mnemonic.split(' ').forEach((word, index) => (mnemonicMap[index + 1] = word));
@@ -1690,9 +1701,7 @@ export const mnemonicFromObject = (mnemonicMap) => {
     ''
   );
 };
-
-export const avatarToImage = (avatar) => {
-  const blob = new Blob(
+export const avatarToImage = (avatar) => { const blob = new Blob(
     [
       createAvatar(style, {
         seed: avatar,

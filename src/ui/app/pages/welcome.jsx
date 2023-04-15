@@ -12,6 +12,9 @@ import {
   ModalHeader,
   ModalOverlay,
 } from '@chakra-ui/modal';
+import {
+  Input,
+} from '@chakra-ui/input';
 import { Box, Spacer, Text, Link } from '@chakra-ui/layout';
 import { useDisclosure } from '@chakra-ui/hooks';
 import { Select } from '@chakra-ui/select';
@@ -22,11 +25,17 @@ import TermsOfUse from '../components/termsOfUse';
 import { ViewIcon, WarningTwoIcon } from '@chakra-ui/icons';
 import { createTab } from '../../../api/extension';
 import { TAB } from '../../../config/config';
+import { createReadOnlyAccount } from '../../../api/extension';
+import { useStoreActions } from 'easy-peasy';
 
 const Welcome = () => {
   const Banner = useColorModeValue(BannerBlack, BannerWhite);
-  const refWallet = React.useRef();
-  const refImport = React.useRef();
+  const [address, setAddress] = React.useState('');
+  const [walletName, setWalletName] = React.useState('');
+  const history = useHistory();
+  const setRoute = useStoreActions(
+    (actions) => actions.globalModel.routeStore.setRoute
+  );
 
   return (
     <>
@@ -69,187 +78,42 @@ const Welcome = () => {
         <Box h="8" />
         <Backpack size={120} mood="blissful" color="#61DDBC" />
         <Box height="8" />
-        <Button
-          display="inline-flex"
-          onClick={() => {
-            refWallet.current.openModal();
-          }}
-          colorScheme="teal"
-          size="md"
-        >
-          New Wallet
-        </Button>
         <Box height="4" />
+        <Input
+          variant={'filled'}
+          onChange={(e) => setWalletName(e.target.value)}
+          width={180}
+          size={'xs'}
+          placeholder={'Wallet Name'}
+          rounded='full'
+          fontWeight='bold'
+        ></Input>
+        <Box h="2" />
+        <Input
+          variant={'filled'}
+          onChange={(e) => setAddress(e.target.value)}
+          width={180}
+          size={'xs'}
+          placeholder={'addr1q...'}
+          rounded='full'
+          fontWeight='bold'
+        ></Input>
+        <Box h="4" />
         <Button
           onClick={() => {
-            refImport.current.openModal();
+            createReadOnlyAccount(walletName || address, address).then(() => {
+              setRoute('/wallet');
+              history.push('/wallet')
+            }).catch(console.log)
           }}
           colorScheme="orange"
           size="sm"
         >
-          Import
+          Import Read-only Wallet
         </Button>
       </Box>
-      <WalletModal ref={refWallet} />
-      <ImportModal ref={refImport} />
     </>
   );
 };
-
-const WalletModal = React.forwardRef((props, ref) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [accept, setAccept] = React.useState(false);
-  const history = useHistory();
-
-  const termsRef = React.useRef();
-
-  React.useImperativeHandle(ref, () => ({
-    openModal() {
-      onOpen();
-    },
-  }));
-  return (
-    <>
-      <Modal size="xs" isOpen={isOpen} onClose={onClose} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader fontSize="md">Create a wallet</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Text fontSize="sm">
-              Make sure no one is watching the screen, while the seed phrase is
-              visible. <ViewIcon />
-            </Text>
-            <Box h="4" />
-            <Box display="flex" alignItems="center" justifyContent="center">
-              <Checkbox onChange={(e) => setAccept(e.target.checked)} />
-              <Box w="2" />
-              <Text>
-                I accept{' '}
-                <Link
-                  onClick={() => termsRef.current.openModal()}
-                  textDecoration="underline"
-                >
-                  Terms of use
-                </Link>
-              </Text>
-              <Box h="2" />
-            </Box>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button mr={3} variant="ghost" onClick={onClose}>
-              Close
-            </Button>
-            <Button
-              isDisabled={!accept}
-              colorScheme="teal"
-              onClick={() => createTab(TAB.createWallet, `?type=generate`)}
-            >
-              Continue
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-      <TermsOfUse ref={termsRef} />
-    </>
-  );
-});
-
-const ImportModal = React.forwardRef((props, ref) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const history = useHistory();
-  const [accept, setAccept] = React.useState(false);
-  const [select, setSelect] = React.useState(null);
-
-  const termsRef = React.useRef();
-
-  React.useImperativeHandle(ref, () => ({
-    openModal() {
-      onOpen();
-    },
-  }));
-  return (
-    <>
-      <Modal size="xs" isOpen={isOpen} onClose={onClose} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader fontSize="md">Import a wallet</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Text fontSize="sm" fontWeight="bold">
-              <WarningTwoIcon mr="1" />
-              Importing Daedalus or Yoroi
-            </Text>
-            <Spacer height="1" />
-            <Text fontSize="13px">
-              We always recommend creating a new wallet, as Nami is best
-              experienced when not simultaneously used with Yoroi/Daedalus. Nami
-              will not track all addresses associated with your imported wallet,
-              and might result in partial reflection of assets. To accurately
-              reflect your balance, please transfer all assets into your new
-              Nami wallet.{' '}
-              <Link
-                textDecoration="underline"
-                onClick={() => window.open('https://namiwallet.io')}
-              >
-                More info
-              </Link>
-            </Text>
-            <Spacer height="4" />
-            <Text fontSize="sm">
-              Make sure no one is watching the screen, while the seed phrase is
-              visible. <ViewIcon />
-            </Text>
-            <Spacer height="6" />
-            <Select
-              size="sm"
-              rounded="md"
-              onChange={(e) => setSelect(e.target.value)}
-              placeholder="Choose seed phrase length"
-            >
-              <option value="15">15-word seed phrase</option>
-              <option value="24">24-word seed phrase</option>
-            </Select>
-            <Box h="5" />
-            <Box display="flex" alignItems="center" justifyContent="center">
-              <Checkbox onChange={(e) => setAccept(e.target.checked)} />
-              <Box w="2" />
-              <Text>
-                I accept{' '}
-                <Link
-                  onClick={() => termsRef.current.openModal()}
-                  textDecoration="underline"
-                >
-                  Terms of use
-                </Link>
-              </Text>
-              <Box h="2" />
-            </Box>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button mr={3} variant="ghost" onClick={onClose}>
-              Close
-            </Button>
-            <Button
-              isDisabled={!select || !accept}
-              colorScheme="teal"
-              onClick={() =>
-                createTab(
-                  TAB.createWallet,
-                  `?type=import&length=${parseInt(select)}`
-                )
-              }
-            >
-              Continue
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-      <TermsOfUse ref={termsRef} />
-    </>
-  );
-});
 
 export default Welcome;

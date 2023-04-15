@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Nami",
+  "name": "Nami ReadOnly",
   "version": "3.4.6",
-  "description": "A wallet to experience Cardano to the fullest",
+  "description": "A wallet to pretend to experience Cardano to the fullest",
   "background": { "service_worker": "background.bundle.js" },
   "action": {
     "default_popup": "mainPopup.html",

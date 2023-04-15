@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@chakra-ui/button';
 import { useHistory } from 'react-router-dom';
 import {
-  createAccount,
+  createReadOnlyAccount,
   createTab,
   deleteAccount,
   displayUnit,
@@ -754,20 +754,16 @@ const NewAccountModal = React.forwardRef((props, ref) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isLoading, setIsLoading] = React.useState(false);
   const [state, setState] = React.useState({
-    password: '',
-    show: false,
+    address: '',
     name: '',
   });
 
   const confirmHandler = async () => {
     setIsLoading(true);
-    try {
-      const index = await createAccount(state.name, state.password);
-      await switchAccount(index);
-      onClose();
-    } catch (e) {
-      setState((s) => ({ ...s, wrongPassword: true }));
-    }
+    await createReadOnlyAccount(state.name || state.address, state.address)
+      .then(switchAccount)
+      .then(onClose)
+      .catch(console.log)
     setIsLoading(false);
   };
 
@@ -779,8 +775,7 @@ const NewAccountModal = React.forwardRef((props, ref) => {
 
   React.useEffect(() => {
     setState({
-      password: '',
-      show: false,
+      address: '',
       name: '',
     });
   }, [isOpen]);
@@ -806,30 +801,16 @@ const NewAccountModal = React.forwardRef((props, ref) => {
           <InputGroup size="md">
             <Input
               variant="filled"
-              isInvalid={state.wrongPassword === true}
               pr="4.5rem"
-              type={state.show ? 'text' : 'password'}
               onChange={(e) =>
-                setState((s) => ({ ...s, password: e.target.value }))
+                setState((s) => ({ ...s, address: e.target.value }))
               }
-              placeholder="Enter password"
+              placeholder="Enter address"
               onKeyDown={(e) => {
                 if (e.key == 'Enter') confirmHandler();
               }}
             />
-            <InputRightElement width="4.5rem">
-              <Button
-                h="1.75rem"
-                size="sm"
-                onClick={() => setState((s) => ({ ...s, show: !s.show }))}
-              >
-                {state.show ? 'Hide' : 'Show'}
-              </Button>
-            </InputRightElement>
           </InputGroup>
-          {state.wrongPassword === true && (
-            <Text color="red.300">Password is wrong</Text>
-          )}
         </ModalBody>
 
         <ModalFooter>
@@ -837,7 +818,6 @@ const NewAccountModal = React.forwardRef((props, ref) => {
             Close
           </Button>
           <Button
-            isDisabled={!state.password || !state.name || isLoading}
             isLoading={isLoading}
             colorScheme="teal"
             onClick={confirmHandler}
