@@ -395,39 +395,28 @@ export const getCollateral = async () => {
   const accounts = await getStorage(STORAGE.accounts);
   const currentAccount = accounts[currentIndex];
   const network = await getNetwork();
-  if (await checkCollateral(currentAccount, network, true)) {
-    await setStorage({ [STORAGE.accounts]: accounts });
+  const collateral = {
+    txHash: "0000000000000000000000000000000000000000000000000000000000000000",
+    txId: 0,
+    lovelace: '5000000'
   }
-  const collateral = currentAccount[network.id].collateral;
-  if (collateral) {
-    const collateralUtxo = Loader.Cardano.TransactionUnspentOutput.new(
-      Loader.Cardano.TransactionInput.new(
-        Loader.Cardano.TransactionHash.from_bytes(
-          Buffer.from(collateral.txHash, 'hex')
-        ),
-        Loader.Cardano.BigNum.from_str(collateral.txId.toString())
+  const collateralUtxo = Loader.Cardano.TransactionUnspentOutput.new(
+    Loader.Cardano.TransactionInput.new(
+      Loader.Cardano.TransactionHash.from_bytes(
+        Buffer.from(collateral.txHash, 'hex')
       ),
-      Loader.Cardano.TransactionOutput.new(
-        Loader.Cardano.Address.from_bech32(
-          currentAccount[network.id].paymentAddr
-        ),
-        Loader.Cardano.Value.new(
-          Loader.Cardano.BigNum.from_str(collateral.lovelace)
-        )
+      Loader.Cardano.BigNum.from_str(collateral.txId.toString())
+    ),
+    Loader.Cardano.TransactionOutput.new(
+      Loader.Cardano.Address.from_bech32(
+        currentAccount[network.id].paymentAddr
+      ),
+      Loader.Cardano.Value.new(
+        Loader.Cardano.BigNum.from_str(collateral.lovelace)
       )
-    );
-    return [collateralUtxo];
-  }
-  const utxos = await getUtxos();
-  return utxos.filter(
-    (utxo) =>
-      utxo
-        .output()
-        .amount()
-        .coin()
-        .compare(Loader.Cardano.BigNum.from_str('50000000')) <= 0 &&
-      !utxo.output().amount().multiasset()
+    )
   );
+  return [collateralUtxo];
 };
 
 export const getAddress = async () => {
