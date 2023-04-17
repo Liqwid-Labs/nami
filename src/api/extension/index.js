@@ -136,39 +136,67 @@ export const getDelegation = async () => {
   };
 };
 
+const forEachAddress = async (callback, empty, cooldown=115) => {
+  const currentAccount = await getCurrentAccount();
+  const addresses =
+    currentAccount.multiAddress
+      ? await getAddresses()
+      : [currentAccount.paymentKeyHashBech32]
+  let acc = empty;
+  for (let address of addresses) {
+    acc = await callback(address, acc)
+    await new Promise(res => setTimeout(res, cooldown));
+  }
+  return acc;
+}
+
+const addAssets = (x, y) => {
+  const union = new Map()
+  x.forEach(v => union.set(v.unit, v));
+  y.forEach(v => {
+    const fromX = union.get(v.unit)?.quantity ?? 0
+    v.quantity = (parseInt(fromX) + parseInt(v.quantity)).toString()
+    union.set(v.unit, v);
+  });
+  return Array.from(union.values());
+};
+
 export const getBalance = async () => {
   await Loader.load();
   const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/addresses/${currentAccount.paymentKeyHashBech32}`
-  );
+
+  const result = 
+   currentAccount.multiAddress
+     ? await blockfrostRequest(`/accounts/${currentAccount.rewardAddr}/addresses/assets`)
+     : await blockfrostRequest(`/addresses/${currentAccount.paymentKeyHashBech32}`);
+
   if (result.error) {
     if (result.status_code === 400) throw APIError.InvalidRequest;
     else if (result.status_code === 500) throw APIError.InternalError;
     else return Loader.Cardano.Value.new(Loader.Cardano.BigNum.from_str('0'));
   }
-  const value = await assetsToValue(result.amount);
+  const value = await assetsToValue(result.amount ?? result);
   return value;
 };
 
+
 export const getBalanceExtended = async () => {
-  const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/addresses/${currentAccount.paymentKeyHashBech32}/extended`
-  );
-  if (result.error) {
-    if (result.status_code === 400) throw APIError.InvalidRequest;
-    else if (result.status_code === 500) throw APIError.InternalError;
-    else return [];
-  }
-  return result.amount;
+  await Loader.load();
+
+  return await forEachAddress(async (address, acc) => {
+    const result = await blockfrostRequest(`/addresses/${address}/extended`);
+    if (result.error) {
+      if (result.status_code === 400) throw APIError.InvalidRequest;
+      else if (result.status_code === 500) throw APIError.InternalError;
+      else return Loader.Cardano.Value.new(Loader.Cardano.BigNum.from_str('0'));
+    }
+    return addAssets(acc, result.amount)
+  }, []);
 };
 
 export const getFullBalance = async () => {
   const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/accounts/${currentAccount.rewardAddr}`
-  );
+  const result = await blockfrostRequest(`/accounts/${currentAccount.rewardAddr}`);
   if (result.error) return '0';
   return (
     BigInt(result.controlled_amount) - BigInt(result.withdrawable_amount)
@@ -196,10 +224,17 @@ export const setBalanceWarning = async () => {
 };
 
 export const getTransactions = async (paginate = 1, count = 10) => {
-  const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/addresses/${currentAccount.paymentKeyHashBech32}/transactions?page=${paginate}&order=desc&count=${count}`
-  );
+  // slow, broken, not that useful since we can't sign new transactions
+  const result = await forEachAddress(async (address, acc) => {
+    const addressResult = await blockfrostRequest(
+      `/addresses/${address}/transactions?page=${paginate}&order=desc&count=${count}`
+    );
+    if (addressResult.error)
+      return acc;
+    else
+      return acc.concat(addressResult);
+  }, [])
+
   if (!result || result.error) return [];
   return result.map((tx) => ({
     txHash: tx.tx_hash,
@@ -286,24 +321,27 @@ export const getSpecificUtxo = async (txHash, txId) => {
  */
 export const getUtxos = async (amount = undefined, paginate = undefined) => {
   const currentAccount = await getCurrentAccount();
-  let result = [];
-  let page = paginate && paginate.page ? paginate.page + 1 : 1;
-  const limit = paginate && paginate.limit ? `&count=${paginate.limit}` : '';
-  while (true) {
-    let pageResult = await blockfrostRequest(
-      `/addresses/${currentAccount.paymentKeyHashBech32}/utxos?page=${page}${limit}`
-    );
-    if (pageResult.error) {
-      if (result.status_code === 400) throw APIError.InvalidRequest;
-      else if (result.status_code === 500) throw APIError.InternalError;
-      else {
-        pageResult = [];
+  const result = await forEachAddress(async (address, acc) => {
+    let page = paginate && paginate.page ? paginate.page + 1 : 1;
+    let addressResult = [];
+    const limit = paginate && paginate.limit ? `&count=${paginate.limit}` : '';
+    while (true) {
+      let pageResult = await blockfrostRequest(
+        `/addresses/${address}/utxos?page=${page}${limit}`
+      );
+      if (pageResult.error) {
+        if (result.status_code === 400) throw APIError.InvalidRequest;
+        else if (result.status_code === 500) throw APIError.InternalError;
+        else {
+          pageResult = [];
+        }
       }
+      addressResult = addressResult.concat(pageResult);
+      if (pageResult.length <= 0 || paginate) break;
+      page++;
     }
-    result = result.concat(pageResult);
-    if (pageResult.length <= 0 || paginate) break;
-    page++;
-  }
+    return acc.concat(addressResult);
+  }, [])
 
   // exclude collateral input from overall utxo set
   if (currentAccount.collateral) {
@@ -316,9 +354,14 @@ export const getUtxos = async (amount = undefined, paginate = undefined) => {
     );
   }
 
-  const address = await getAddress();
+  const addrToHex = address =>
+    Buffer.from(
+      Loader.Cardano.Address.from_bech32(address).to_bytes(),
+      'hex'
+    ).toString('hex');
+
   let converted = await Promise.all(
-    result.map(async (utxo) => await utxoFromJson(utxo, address))
+    result.map(async (utxo) => await utxoFromJson(utxo, addrToHex(utxo.address)))
   );
   // filter utxos
   if (amount) {
@@ -427,6 +470,14 @@ export const getAddress = async () => {
     'hex'
   ).toString('hex');
   return paymentAddr;
+};
+
+export const getAddresses = async () => {
+  await Loader.load();
+  const currentAccount = await getCurrentAccount();
+  const rewardAddress = currentAccount.rewardAddr;
+  const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses`)).map(({ address }) => address)
+  return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
 };
 
 export const getRewardAddress = async () => {
@@ -1317,6 +1368,7 @@ export const createAccount = async (name, accountIndex = null) => {
       paymentKeyHashBech32,
       stakeKeyHash,
       name,
+      multiAddress: false,
       [NETWORK_ID.mainnet]: {
         ...networkDefault,
         paymentAddr: paymentAddrMainnet,
@@ -1822,6 +1874,7 @@ export const getAsset = async (unit) => {
 export const updateBalance = async (currentAccount, network) => {
   await Loader.load();
   const assets = await getBalanceExtended();
+  console.log(assets)
   const amount = await assetsToValue(assets);
   await checkCollateral(currentAccount, network);
 
@@ -1980,3 +2033,18 @@ export const toUnit = (amount, decimals = 6) => {
   else if (result == 'NaN') return '0';
   return result;
 };
+
+export const getMultiAddress = async () => {
+  return !!(await getCurrentAccount().multiAddress)
+}
+
+export const setMultiAddress = async (value) => {
+  const currentAccountIndex = await getCurrentAccountIndex();
+  const accounts = await getStorage(STORAGE.accounts);
+  accounts[currentAccountIndex].multiAddress = value;
+  return await setStorage({
+    [STORAGE.accounts]: {
+      ...accounts
+    }
+  });
+}

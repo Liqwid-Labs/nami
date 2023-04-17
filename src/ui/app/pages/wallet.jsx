@@ -10,12 +10,16 @@ import {
   getCurrentAccount,
   getCurrentAccountIndex,
   getDelegation,
+  getMultiAddress,
   getNativeAccounts,
   getNetwork,
   getTransactions,
   isHW,
+  setMultiAddress,
   switchAccount,
   updateAccount,
+  
+  getBalance
 } from '../../../api/extension';
 import { Box, Spacer, Stack, Text } from '@chakra-ui/layout';
 
@@ -25,11 +29,12 @@ import {
   BsClockHistory,
 } from 'react-icons/bs';
 import {
+  FormControl,
+  FormLabel,
   Icon,
   Image,
   Input,
   InputGroup,
-  InputRightElement,
   Menu,
   MenuButton,
   MenuDivider,
@@ -56,6 +61,7 @@ import {
   PopoverBody,
   PopoverArrow,
   PopoverCloseButton,
+  Switch,
   Tabs,
   TabList,
   Tab,
@@ -118,6 +124,7 @@ const Wallet = () => {
     delegation: null,
     network: { id: '', node: '' },
   });
+  const [multiAddress, setMultiAddress_] = React.useState(null)
   const [menu, setMenu] = React.useState(false);
   const newAccountRef = React.useRef();
   const aboutRef = React.useRef();
@@ -155,9 +162,10 @@ const Wallet = () => {
       account: null,
       delegation: null,
     }));
-    await updateAccount(forceUpdate);
     const allAccounts = await getAccounts();
     const currentAccount = allAccounts[currentIndex];
+    setMultiAddress_(currentAccount.multiAddress);
+    await updateAccount(forceUpdate);
     currentAccount.ft =
       currentAccount.lovelace > 0
         ? [
@@ -225,6 +233,11 @@ const Wallet = () => {
       accountChangeHandler && accountChangeHandler.remove();
     };
   }, []);
+
+  React.useEffect(() => {
+    if (multiAddress !== null)
+      setMultiAddress(multiAddress)
+  }, [multiAddress])
 
   return (
     <>
@@ -618,6 +631,35 @@ const Wallet = () => {
               decimals={2}
             />
           </Box>
+          <Box
+            position="absolute"
+            style={{ top: 152, right: 24 }}
+          >
+            <FormControl display='flex' alignItems='center'>
+              <FormLabel htmlFor='multiAddress' mb='0'>
+                Multi-address
+              </FormLabel>
+              <Switch
+                isChecked={multiAddress ?? false}
+                onChange={e => setMultiAddress_(e.target.checked)}
+                id='multiAddress' />
+            </FormControl>
+          </Box>
+
+          <Box
+            position="absolute"
+            style={{ top: 152, right: 184 }}
+          >
+                <Button
+                  colorScheme="teal"
+                  size="sm"
+                  rounded="xl"
+                  shadow="md"
+                  onClick={() => getBalance().then(console.log)}
+                >
+                  O
+                </Button>
+          </Box>
 
           <Box
             position="absolute"
@@ -718,19 +760,6 @@ const Wallet = () => {
               <CollectiblesViewer
                 assets={state.account && state.account.nft}
                 onUpdateAvatar={() => getData()}
-              />
-            </TabPanel>
-            <TabPanel>
-              <HistoryViewer
-                network={state.network}
-                history={state.account && state.account.history}
-                currentAddr={state.account && state.account.paymentAddr}
-                addresses={
-                  state.accounts &&
-                  Object.keys(state.accounts).map(
-                    (index) => state.accounts[index].paymentAddr
-                  )
-                }
               />
             </TabPanel>
           </TabPanels>
