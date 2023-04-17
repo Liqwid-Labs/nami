@@ -149,7 +149,7 @@ const Wallet = () => {
       ) {
         await getData();
       }
-    }, 1000);
+    }, 10000);
 
   const getData = async (forceUpdate) => {
     const currentIndex = await getCurrentAccountIndex();

@@ -224,23 +224,27 @@ export const setBalanceWarning = async () => {
 };
 
 export const getTransactions = async (paginate = 1, count = 10) => {
-  // slow, broken, not that useful since we can't sign new transactions
-  const result = await forEachAddress(async (address, acc) => {
-    const addressResult = await blockfrostRequest(
-      `/addresses/${address}/transactions?page=${paginate}&order=desc&count=${count}`
-    );
-    if (addressResult.error)
-      return acc;
-    else
-      return acc.concat(addressResult);
-  }, [])
+  // slow, not that useful since we can't sign new transactions
+  try {
+    const result = await forEachAddress(async (address, acc) => {
+      const addressResult = await blockfrostRequest(
+        `/addresses/${address}/transactions?page=${paginate}&order=desc&count=${count}`
+      );
+      if (addressResult.error)
+        return acc;
+      else
+        return acc.concat(addressResult);
+    }, [])
 
-  if (!result || result.error) return [];
-  return result.map((tx) => ({
-    txHash: tx.tx_hash,
-    txIndex: tx.tx_index,
-    blockHeight: tx.block_height,
-  }));
+    if (!result || result.error) return [];
+    return result.map((tx) => ({
+      txHash: tx.tx_hash,
+      txIndex: tx.tx_index,
+      blockHeight: tx.block_height,
+    }));
+  } catch {
+    return [];
+  }
 };
 
 export const getTxInfo = async (txHash) => {
@@ -476,8 +480,12 @@ export const getAddresses = async () => {
   await Loader.load();
   const currentAccount = await getCurrentAccount();
   const rewardAddress = currentAccount.rewardAddr;
-  const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc&count=10`)).map(({ address }) => address)
-  return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
+  try {
+    const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc&count=10`)).map(({ address }) => address)
+    return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
+  } catch {
+    return [currentAccount.paymentAddr];
+  }
 };
 
 export const getRewardAddress = async () => {
@@ -1874,7 +1882,6 @@ export const getAsset = async (unit) => {
 export const updateBalance = async (currentAccount, network) => {
   await Loader.load();
   const assets = await getBalanceExtended();
-  console.log(assets)
   const amount = await assetsToValue(assets);
   await checkCollateral(currentAccount, network);
 
