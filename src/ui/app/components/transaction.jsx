@@ -411,7 +411,7 @@ const genDisplayInfo = (txHash, detail, currentAddr, addresses) => {
   );
   const assets = amounts.filter((amount) => amount.unit !== 'lovelace');
   const lovelace = BigInt(
-    amounts.find((amount) => amount.unit === 'lovelace').quantity
+    amounts.find((amount) => amount.unit === 'lovelace')?.quantity ?? 0
   );
 
   return {

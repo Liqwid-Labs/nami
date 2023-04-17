@@ -149,7 +149,7 @@ const Wallet = () => {
       ) {
         await getData();
       }
-    }, 10000);
+    }, 1000);
 
   const getData = async (forceUpdate) => {
     const currentIndex = await getCurrentAccountIndex();
@@ -648,21 +648,6 @@ const Wallet = () => {
 
           <Box
             position="absolute"
-            style={{ top: 152, right: 184 }}
-          >
-                <Button
-                  colorScheme="teal"
-                  size="sm"
-                  rounded="xl"
-                  shadow="md"
-                  onClick={() => getBalance().then(console.log)}
-                >
-                  O
-                </Button>
-          </Box>
-
-          <Box
-            position="absolute"
             style={{ top: 186, right: 134 }}
             width="20"
             height="8"
@@ -760,6 +745,19 @@ const Wallet = () => {
               <CollectiblesViewer
                 assets={state.account && state.account.nft}
                 onUpdateAvatar={() => getData()}
+              />
+            </TabPanel>
+            <TabPanel>
+              <HistoryViewer
+                network={state.network}
+                history={state.account && state.account.history}
+                currentAddr={state.account && state.account.paymentAddr}
+                addresses={
+                  state.accounts &&
+                  Object.keys(state.accounts).map(
+                    (index) => state.accounts[index].paymentAddr
+                  )
+                }
               />
             </TabPanel>
           </TabPanels>

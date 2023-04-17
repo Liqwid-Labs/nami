@@ -476,7 +476,7 @@ export const getAddresses = async () => {
   await Loader.load();
   const currentAccount = await getCurrentAccount();
   const rewardAddress = currentAccount.rewardAddr;
-  const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses`)).map(({ address }) => address)
+  const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc&count=10`)).map(({ address }) => address)
   return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
 };
 
