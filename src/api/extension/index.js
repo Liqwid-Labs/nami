@@ -481,7 +481,7 @@ export const getAddresses = async (format = 'bech32') => {
   const currentAccount = await getCurrentAccount();
   const rewardAddress = currentAccount.rewardAddr;
   try {
-    const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc`)).map(({ address }) => address)
+    const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc&count=20`)).map(({ address }) => address)
     if (format === 'bech32')
       return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
     else if (format === 'hex')
