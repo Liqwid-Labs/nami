@@ -1,6 +1,7 @@
 import {
   enable,
-  getAddress,
+  getChangeAddress,
+  getAddresses,
   getBalance,
   getCollateral,
   getNetworkId,
@@ -36,9 +37,9 @@ window.cardano = {
   submitTx: (tx) => logDeprecated() && submitTx(tx),
   getUtxos: (amount, paginate) => logDeprecated() && getUtxos(amount, paginate),
   getCollateral: () => logDeprecated() && getCollateral(),
-  getUsedAddresses: async () => logDeprecated() && [await getAddress()],
+  getUsedAddresses: async () => logDeprecated() && await getAddresses(),
   getUnusedAddresses: async () => logDeprecated() && [],
-  getChangeAddress: () => logDeprecated() && getAddress(),
+  getChangeAddress: () => logDeprecated() && getChangeAddress(),
   getRewardAddress: () => logDeprecated() && getRewardAddress(),
   getNetworkId: () => logDeprecated() && getNetworkId(),
   onAccountChange: (callback) =>
@@ -62,9 +63,9 @@ window.cardano = {
           signTx: (tx, partialSign) => signTx(tx, partialSign),
           submitTx: (tx) => submitTx(tx),
           getUtxos: (amount, paginate) => getUtxos(amount, paginate),
-          getUsedAddresses: async () => [await getAddress()],
+          getUsedAddresses: async () => await getAddresses(),
           getUnusedAddresses: async () => [],
-          getChangeAddress: () => getAddress(),
+          getChangeAddress: () => getChangeAddress(),
           getRewardAddresses: async () => [await getRewardAddress()],
           getNetworkId: () => getNetworkId(),
           experimental: {

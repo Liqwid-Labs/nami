@@ -2,8 +2,10 @@ import {
   createPopup,
   extractKeyHash,
   getAddress,
+  getAddresses,
   getBalance,
   getCollateral,
+  getMultiAddress,
   getNetwork,
   getRewardAddress,
   getUtxos,
@@ -123,12 +125,31 @@ app.add(METHOD.isEnabled, (request, sendResponse) => {
     });
 });
 
-app.add(METHOD.getAddress, async (request, sendResponse) => {
+app.add(METHOD.getChangeAddress, async (request, sendResponse) => {
   const address = await getAddress();
   if (address) {
     sendResponse({
       id: request.id,
       data: address,
+      target: TARGET,
+      sender: SENDER.extension,
+    });
+  } else {
+    sendResponse({
+      id: request.id,
+      error: APIError.InternalError,
+      target: TARGET,
+      sender: SENDER.extension,
+    });
+  }
+});
+
+app.add(METHOD.getAddresses, async (request, sendResponse) => {
+  const addresses = (await getMultiAddress()) ? (await getAddresses('hex')) : [await getAddress()];
+  if (addresses) {
+    sendResponse({
+      id: request.id,
+      data: addresses,
       target: TARGET,
       sender: SENDER.extension,
     });

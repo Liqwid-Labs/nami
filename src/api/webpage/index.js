@@ -41,9 +41,16 @@ export const signTx = async (tx, partialSign = false) => {
   return result.data;
 };
 
-export const getAddress = async () => {
+export const getAddresses = async () => {
   const result = await Messaging.sendToContent({
-    method: METHOD.getAddress,
+    method: METHOD.getAddresses,
+  });
+  return result.data;
+};
+
+export const getChangeAddress = async () => {
+  const result = await Messaging.sendToContent({
+    method: METHOD.getChangeAddress,
   });
   return result.data;
 };

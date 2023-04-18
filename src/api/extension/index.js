@@ -476,13 +476,22 @@ export const getAddress = async () => {
   return paymentAddr;
 };
 
-export const getAddresses = async () => {
+export const getAddresses = async (format = 'bech32') => {
   await Loader.load();
   const currentAccount = await getCurrentAccount();
   const rewardAddress = currentAccount.rewardAddr;
   try {
-    const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc&count=10`)).map(({ address }) => address)
-    return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
+    const allAddresses = (await blockfrostRequest(`/accounts/${rewardAddress}/addresses?order=desc`)).map(({ address }) => address)
+    if (format === 'bech32')
+      return allAddresses.filter(address => address[address.indexOf('1') + 1] === 'q');
+    else if (format === 'hex')
+      return allAddresses.map(addr =>
+        Buffer.from(
+          Loader.Cardano.Address.from_bech32(addr).to_bytes(),
+          'hex'
+        ).toString('hex')).filter(address => address[0] === '0');
+    else
+      throw 'unknown format';
   } catch {
     return [currentAccount.paymentAddr];
   }
@@ -2042,7 +2051,7 @@ export const toUnit = (amount, decimals = 6) => {
 };
 
 export const getMultiAddress = async () => {
-  return !!(await getCurrentAccount().multiAddress)
+  return !!((await getCurrentAccount()).multiAddress)
 }
 
 export const setMultiAddress = async (value) => {

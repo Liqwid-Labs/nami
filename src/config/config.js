@@ -11,6 +11,7 @@ export const METHOD = {
   getUtxos: 'getUtxos',
   getCollateral: 'getCollateral',
   getRewardAddress: 'getRewardAddress',
+  getChangeAddress: 'getChangeAddress',
   getAddress: 'getAddress',
   signData: 'signData',
   signTx: 'signTx',
