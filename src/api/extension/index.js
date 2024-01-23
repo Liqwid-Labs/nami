@@ -442,11 +442,11 @@ export const getCollateral = async () => {
   const accounts = await getStorage(STORAGE.accounts);
   const currentAccount = accounts[currentIndex];
   const network = await getNetwork();
-  //const collateral = {
-  //  txHash: "0000000000000000000000000000000000000000000000000000000000000000",
-  //  txId: 0,
-  //  lovelace: '5000000'
-  //}
+  const collateral = {
+    txHash: "c2cc03f822737dd3c66643e8814cc5931a58229bda437a69fa4cb32d7e20bdc4",
+    txId: 0,
+    lovelace: '5000000'
+  }
   const collateralUtxo = Loader.Cardano.TransactionUnspentOutput.new(
     Loader.Cardano.TransactionInput.new(
       Loader.Cardano.TransactionHash.from_bytes(
